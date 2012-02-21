@@ -1,0 +1,22 @@
+laden Juan Pedro Paredes Caballero <juampe@iquis.com>
+
+Send commands to hosts or hosts group and save the output in a repository in order to audit later 
+The hosts have to be accesibe by rsh (Prefered SSH flavour with key authentication) and included in /etc/hosts too
+
+group to define groups of hosts
+
+Use
+Command modes: view cmd file
+        mode view(v)
+        mode cmd(c)
+        mode file(f)
+Append modes: append noappend
+        mode append(>>):
+        mode noappend(>):
+Commands: host group repository select quit
+        group(g):       [group]
+        host(h):        [host] [host] ...
+        repository(r)
+        select(s)
+        quit(q)
+

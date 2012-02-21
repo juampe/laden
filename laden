@@ -1,0 +1,201 @@
+#!/usr/bin/perl
+
+use Term::ReadLine;
+use POSIX qw(strftime);
+
+$cfgfile="laden.cfg";
+do "$cfgfile";
+
+#open HOSTS,$hostfile;
+#@hosts=<HOSTS>;
+#close HOSTS;
+
+
+open GROUPS,$groupfile;
+@groups=<GROUPS>;
+close GROUPS;
+
+%grp=();
+%add=();
+@all=();
+foreach $group(@groups){
+	($g,$h)=split(/:/,$group);
+	chomp $g;
+	chomp $h;
+	@h=split(/,/,$h);
+	%add=("$g" => [@h]);
+	%grp=(%grp,%add);
+	@all=(@all,@h);
+}
+%add=("all" => [@all]);
+%grp=(%grp,%add);
+
+$env="PATH=/usr/sbin/osa:/usr/bin:/usr/ucb:/etc:/usr/local/bin:/usr/dt/bin:/usr/openwin/bin:/bin:/usr/sbin";
+
+mkdir $rep;
+
+sub view{
+	my $scmd=$_;
+        open PAGER,"| $pager";
+	foreach $host(@{$grp{$group}}){
+		if(open INPUT,"$rep/$host/$scmd"){
+			$/="º";
+			my $res=<INPUT>;
+			print PAGER $res;
+			close INPUT;
+		}else{
+			print PAGER "$calrm$host $scmd not found$cnorm\n";
+		}
+	}
+	close PAGER ;
+}
+
+sub rep{
+        open PAGER,"| $pager";
+	foreach $host(@{$grp{$group}}){
+		$res="$chi#$host$cnorm\n";
+		$cmds=`find $rep/$host/`;
+		$cmds=~s/$rep\/$host\///g;
+		$res.=$cmds;
+		print PAGER $res;
+	}
+	close PAGER ;
+}
+
+sub cmd{
+	my $ecmd=$_;
+	#open PAGER,"| $pager";
+	foreach $host(@{$grp{$group}}){
+		my $res=`rsh $host "$env;$ecmd"`;
+		if($res!~/not found$|cannot execute$/){
+			my $date = strftime("%Y-%m-%d %H:%M:%S",localtime);
+			$res="$chi#$host $ecmd $date$cnorm\n".$res;
+			print $res;
+
+			mkdir "$rep/$host";
+			
+			$ecmd=~s/\//\\\//g;
+			open OUTPUT,"$append$rep/$host/$ecmd";
+			print OUTPUT $res;	
+			close OUTPUT;
+		}else{
+			print "$host not found\n"
+		}
+	}
+	#close PAGER ;
+}
+
+sub file{
+	my $ecmd=$_;
+	$ecmd=~s/\/$//g;
+	foreach $host(@{$grp{$group}}){
+		my @names=`rsh $host ls -F $ecmd`;
+		my $path=`rsh $host ls -dF $ecmd`;
+		chomp $path;
+		$path=~s/.*\///g;
+		$path=$&;
+		$path=~s/\/$//g;
+		foreach $name(@names){
+			if($name!~/[\/\|@]$/){
+				$name=~s/.*\///g;
+				$name=~s/\*$//g;
+				my $res=`rsh $host cat $path/$name`;
+				if($res!~/^cat: cannot open/){
+					my $date = strftime("%Y-%m-%d %H:%M:%S",localtime);
+					$res="$chi#$host $path/$name $date$cnorm\n".$res;
+					print $res;
+
+					system "mkdir -p $rep/$host/$path";
+
+					open OUTPUT,"$append$rep/$host/$path/$name";
+					print OUTPUT $res;	
+					close OUTPUT;
+				}else{
+					print "$host not found $path/$name\n"
+				}
+			}
+		}
+	}
+	#close PAGER ;
+}
+
+#Loop principal
+$term = new Term::ReadLine 'laden';
+$OUT = $term->OUT || STDOUT;
+print "laden: Command and Config Fetcher\n";
+$mode="view";
+$append=">";
+$group="all";
+while(($_=$term->readline("laden($mode)[$group]$append "))!~/^exit$|^quit$|^q$/){
+	$command=$_;
+	chomp $command;
+	if($command=~/^group \w+$|^g \w+$/){
+		(my $g,$group)=split(/ /,$command);
+		next;
+	}elsif($command=~/^host( \w+)+|^h( \w+)+/){
+		(my $g,@all)=split(/ /,$command);
+		$group="host";
+		%add=("host" => [@all]);
+		%grp=(%grp,%add);
+		next;
+	}elsif($command=~/^view$|^v$/){
+		$mode="view";
+		next;
+	}elsif($command=~/^cmd$|^c$/){
+		$mode="cmd";
+		next;
+	}elsif($command=~/^file$|^f$/){
+		$mode="file";
+		next;
+	}elsif($command=~/^repository$|^r$/){
+		rep();
+		next;
+	}elsif($command=~/^select$|^s$/){
+		foreach $host(@{$grp{$group}}){
+			print "$host ";
+		}
+		print "\n";
+		next;
+	}elsif($command=~/^download$|^d$/){
+		$mode="dwn";
+		next;
+	}elsif($command=~/^noappend$|^nap$|^>$/){
+		$append=">";
+		next;
+	}elsif($command=~/^append$|^ap$|^>>$/){
+		$append=">>";
+		next;
+	}elsif($command=~/^help$|^h$|^\?$/){
+print <<"EOF";
+Command modes: view cmd file
+	mode view(v)	
+	mode cmd(c)	
+	mode file(f)	
+Append modes: append noappend
+	mode append(>>):
+	mode noappend(>):
+Commands: host group repository select quit
+	group(g):	[group]
+	host(h):	[host] [host] ...
+	repository(r)
+	select(s)
+	quit(q)
+EOF
+		next;
+	}elsif($command=~/^ls|^cd|^cat/){
+		print "Command not available\n";
+		next;
+	}elsif($command=~/^$/){
+		next;
+	}
+	
+	if($mode=~/^view$/){
+		view($command);
+	}elsif($mode=~/^cmd$/){
+		cmd($command);
+	}elsif($mode=~/^file$/){
+		file($command);
+	}
+	$term->addhistory($command) if /\S/;
+}
+
