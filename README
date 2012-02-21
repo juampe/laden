@@ -1,4 +1,4 @@
-laden: Command and Config Fetcher
+laden: UNIX Command and Config Fetcher
 Juan Pedro Paredes Caballero <juampe@iquis.com>
 
 Send commands to hosts or hosts group and save the output in a repository in order to audit later 
