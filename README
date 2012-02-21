@@ -1,4 +1,5 @@
-laden Juan Pedro Paredes Caballero <juampe@iquis.com>
+laden: Command and Config Fetcher
+Juan Pedro Paredes Caballero <juampe@iquis.com>
 
 Send commands to hosts or hosts group and save the output in a repository in order to audit later 
 The hosts have to be accesibe by rsh (Prefered SSH flavour with key authentication) and included in /etc/hosts too
